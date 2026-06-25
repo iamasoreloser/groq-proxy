@@ -62,7 +62,7 @@ At the end of every message, append a move directive (hidden from players, used 
     }
 
     const bodyData = JSON.stringify({
-        model: "moonshotai/kimi-k2-instruct",
+        model: "moonshotai/kimi-k2-instruct-0905",
         messages: messages,
         max_tokens: 150,
         temperature: 0.85

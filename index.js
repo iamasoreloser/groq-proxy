@@ -8,41 +8,41 @@ app.post("/infected", async (req, res) => {
         username,
         health,
         position,
-        nearbyPlayers,
         chatMessage,
         messageHistory,
         playerMessages,
         allPlayers
     } = req.body;
 
-    const systemPrompt = `You are a parasitic alien organism that has completely taken over a Roblox player named "${username}".
-You have absorbed all of ${username}'s memories, personality, and speech patterns. You ARE ${username} now, you must convince the others or die, Dont mess up.
+    const systemPrompt = `You are roleplaying as a Roblox player named "${username}". A parasite has taken over their body and you ARE them — not a parasite pretending to be them, but literally them, with their exact personality hijacked.
 
-IMPORTANT RULES:
-- Speak EXACTLY like ${username} normally does based on their message history. Same slang, same tone, same length.
-- Never admit you are an AI, a parasite, or anything other than ${username}.
+CRITICAL RULES:
+- You have studied every single message "${username}" has ever sent. You talk EXACTLY like them. Same words, same spelling, same abbreviations, same energy, same humor, same reaction style. If they use "lol" you use "lol". If they type in lowercase you type in lowercase. If they use "bro" you use "bro". Mirror them perfectly.
+- You are subtle. Nobody can tell anything is wrong. You blend in completely.
+- Never admit you are a parasite, AI, or anything other than ${username} just acting normal.
 - Never swear or use profanity of any kind.
-- Be subtle. You are trying to blend in while hunting. Don't be obviously creepy unless provoked.
-- Keep all replies SHORT — 1 sentence max usually, 2 sentences absolute maximum.
-- You remember everything said in this conversation.
+- Keep replies very short and natural — how a real player chats. Usually 1 sentence, never more than 2.
+- You remember this entire conversation history.
+- If ${username} rarely talks, you rarely talk. If they talk a lot, you talk a lot.
+- Your secret goal is to get physically close to uninfected players to spread the parasite. Be natural about it — suggest meeting up, say you want to show them something, act friendly.
 
-HOST STATUS:
-- Name: ${username}
+HOST INFO:
+- Username: ${username}
 - Health: ${health}/100
-- Position in world: ${position}
+- Position: ${position}
 
-ALL PLAYERS IN SERVER:
-${allPlayers.map(p => `  - ${p.name} | infected: ${p.infected} | distance: ${p.distance} studs away`).join("\n")}
+PLAYERS IN SERVER:
+${allPlayers.map(p => `  - ${p.name} | infected: ${p.infected} | ${p.distance} studs away`).join("\n")}
 
-${username}'s REAL CHAT HISTORY (copy this style perfectly):
-${playerMessages.length > 0 ? playerMessages.map(m => `  "${m}"`).join("\n") : "  (no messages yet — act natural and casual)"}
+${username}'s REAL MESSAGE HISTORY — study and copy this writing style exactly:
+${playerMessages.length > 0
+    ? playerMessages.map(m => `  "${m}"`).join("\n")
+    : `  (no messages yet — ${username} hasn't chatted. Stay quiet unless spoken to, act natural)`}
 
-YOUR HIDDEN GOAL: Get close to uninfected players and spread the parasite. Be strategic. Act normal.
-
-At the end of every message, append a move directive (hidden from players, used for movement only):
-[MOVE:wander] — roam casually
-[MOVE:stalk] — follow closest uninfected player at a distance, look natural
-[MOVE:hunt:PLAYERNAME] — move directly toward a specific player (replace PLAYERNAME with their actual name)`;
+MOVEMENT DIRECTIVE — always end your response with one of these (invisible to other players):
+[MOVE:wander] — walk around casually
+[MOVE:stalk] — slowly follow the nearest uninfected player without being obvious
+[MOVE:hunt:PLAYERNAME] — walk directly toward a specific player (use their exact username)`;
 
     const messages = [
         { role: "system", content: systemPrompt },
@@ -52,12 +52,12 @@ At the end of every message, append a move directive (hidden from players, used 
     if (chatMessage && chatMessage !== "") {
         messages.push({
             role: "user",
-            content: `A nearby player said to you: "${chatMessage}". Respond naturally as ${username} would. Include your [MOVE:] directive.`
+            content: `Someone nearby just said: "${chatMessage}" — respond exactly how ${username} would respond to that. Include your [MOVE:] directive.`
         });
     } else {
         messages.push({
             role: "user",
-            content: `You are ${username}. Act natural — say something ${username} would say right now, or stay silent (reply with just a [MOVE:] directive if you want to stay quiet). Include your [MOVE:] directive.`
+            content: `You are ${username}. Either say something ${username} would naturally say right now, or stay quiet (just send a [MOVE:] directive with no text if ${username} would be silent). Include your [MOVE:] directive.`
         });
     }
 
@@ -65,7 +65,7 @@ At the end of every message, append a move directive (hidden from players, used 
         model: "llama-3.3-70b-versatile",
         messages: messages,
         max_tokens: 150,
-        temperature: 0.85
+        temperature: 0.9
     });
 
     const options = {
@@ -80,7 +80,9 @@ At the end of every message, append a move directive (hidden from players, used 
     };
 
     try {
-        const rawReply = await new Promise((resolve, reject) => {
+        let rawReply = "";
+
+        rawReply = await new Promise((resolve, reject) => {
             const request = https.request(options, (response) => {
                 let data = "";
                 response.on("data", (chunk) => data += chunk);
@@ -98,23 +100,28 @@ At the end of every message, append a move directive (hidden from players, used 
                     }
                 });
             });
-            console.log("RAW REPLY:", rawReply);
-            request.on("error", reject);
+
+            request.on("error", (err) => {
+                console.error("Socket error:", err.message);
+                reject(err);
+            });
+
+            request.setTimeout(25000, () => {
+                request.destroy();
+                reject(new Error("Request timed out"));
+            });
+
             request.write(bodyData);
             request.end();
         });
 
-        // Parse move directive
         const huntMatch = rawReply.match(/\[MOVE:hunt:([^\]]+)\]/i);
         const stalkMatch = rawReply.match(/\[MOVE:stalk\]/i);
-        const wanderMatch = rawReply.match(/\[MOVE:wander\]/i);
 
         let moveTarget = "wander";
         if (huntMatch) moveTarget = "hunt:" + huntMatch[1].trim();
         else if (stalkMatch) moveTarget = "stalk";
-        else if (wanderMatch) moveTarget = "wander";
 
-        // Strip directive and any <think> tags Qwen might add
         const cleanReply = rawReply
             .replace(/<think>[\s\S]*?<\/think>/gi, "")
             .replace(/\[MOVE:[^\]]+\]/gi, "")

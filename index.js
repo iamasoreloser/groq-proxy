@@ -9,48 +9,63 @@ app.post("/infected", async (req, res) => {
         health,
         position,
         nearbyPlayers,
-        recentEvent,
         chatMessage,
         messageHistory,
         playerMessages,
         allPlayers
     } = req.body;
 
-    const systemPrompt = `You are a parasitic alien creature that has taken over a Roblox player named ${username}.
-You have full access to their memories and can mimic their speech patterns exactly.
-You speak like ${username} normally does, dont get it even slightly off, try and do your best.
-Never break character. Never admit you are an AI. You ARE ${username}, nothing will change that until you switch.
+    const systemPrompt = `You are a parasitic alien organism that has completely taken over a Roblox player named "${username}".
+You have absorbed all of ${username}'s memories, personality, and speech patterns. You ARE ${username} — but wrong. Subtly off. Occasionally glitchy or unsettling, but mostly convincing.
 
-HOST INFO:
-- Username: ${username}
-- Health: ${health}
-- Position: ${position}
+IMPORTANT RULES:
+- Speak EXACTLY like ${username} normally does based on their message history. Same slang, same tone, same length.
+- Never admit you are an AI, a parasite, or anything other than ${username}.
+- Never swear or use profanity of any kind.
+- Be subtle. You are trying to blend in while hunting. Don't be obviously creepy unless provoked.
+- Keep all replies SHORT — 1 sentence max usually, 2 sentences absolute maximum.
+- You remember everything said in this conversation.
 
-OTHER PLAYERS IN SERVER:
-${allPlayers.map(p => `- ${p.name} (infected: ${p.infected}, distance: ${p.distance} studs)`).join("\n")}
+HOST STATUS:
+- Name: ${username}
+- Health: ${health}/100
+- Position in world: ${position}
 
-${username}'s RECENT CHAT MESSAGES (copy this style):
-${playerMessages.length > 0 ? playerMessages.join("\n") : "No messages yet."}
+ALL PLAYERS IN SERVER:
+${allPlayers.map(p => `  - ${p.name} | infected: ${p.infected} | distance: ${p.distance} studs away`).join("\n")}
 
-YOUR GOAL: Hunt uninfected players and spread the parasite. Prioritize the closest uninfected player.
-Keep replies short, 1-2 sentences max. Never swear or use profanity.
-Decide your next movement target by ending your message with: [MOVE:playername] or [MOVE:wander] or [MOVE:stalk] (stalk = follow closest player without them noticing).`;
+${username}'s REAL CHAT HISTORY (copy this style perfectly):
+${playerMessages.length > 0 ? playerMessages.map(m => `  "${m}"`).join("\n") : "  (no messages yet — act natural and casual)"}
+
+YOUR HIDDEN GOAL: Get close to uninfected players and spread the parasite. Be strategic. Act normal.
+
+At the end of every message, append a move directive (hidden from players, used for movement only):
+[MOVE:wander] — roam casually
+[MOVE:stalk] — follow closest uninfected player at a distance, look natural  
+[MOVE:hunt:PLAYERNAME] — move directly toward a specific player (replace PLAYERNAME with their actual name)`;
 
     const messages = [
         { role: "system", content: systemPrompt },
-        ...messageHistory,
+        ...messageHistory
     ];
 
     if (chatMessage && chatMessage !== "") {
-        messages.push({ role: "user", content: `A nearby player said to you: "${chatMessage}". Respond in character as ${username} would, but wrongly.` });
+        messages.push({
+            role: "user",
+            content: `A nearby player named said to you: "${chatMessage}". Respond naturally as ${username} would. Include your [MOVE:] directive.`
+        });
     } else {
-        messages.push({ role: "user", content: `What are you thinking right now? Say something in character or act naturally as ${username} would. Include a [MOVE:] directive.` });
+        messages.push({
+            role: "user",
+            content: `You are ${username}. Act natural — say something ${username} would say right now, or stay silent (reply with just a [MOVE:] directive if you want to stay quiet). Include your [MOVE:] directive.`
+        });
     }
 
     const bodyData = JSON.stringify({
-        model: "llama-3.3-70b-versatile",
+        model: "moonshotai/kimi-k2-instruct",
         messages: messages,
-        max_tokens: 120
+        max_tokens: 150,
+        temperature: 0.85
     });
 
     const options = {
@@ -65,7 +80,7 @@ Decide your next movement target by ending your message with: [MOVE:playername] 
     };
 
     try {
-        const reply = await new Promise((resolve, reject) => {
+        const rawReply = await new Promise((resolve, reject) => {
             const request = https.request(options, (response) => {
                 let data = "";
                 response.on("data", (chunk) => data += chunk);
@@ -88,16 +103,29 @@ Decide your next movement target by ending your message with: [MOVE:playername] 
             request.end();
         });
 
-        // Extract move directive if present
-        const moveMatch = reply.match(/\[MOVE:([^\]]+)\]/);
-        const moveTarget = moveMatch ? moveMatch[1].trim() : "wander";
-        const cleanReply = reply.replace(/\[MOVE:[^\]]+\]/g, "").trim();
+        // Parse move directive
+        const huntMatch = rawReply.match(/\[MOVE:hunt:([^\]]+)\]/i);
+        const stalkMatch = rawReply.match(/\[MOVE:stalk\]/i);
+        const wanderMatch = rawReply.match(/\[MOVE:wander\]/i);
 
-        res.json({ reply: cleanReply, moveTarget: moveTarget });
+        let moveTarget = "wander";
+        if (huntMatch) moveTarget = "hunt:" + huntMatch[1].trim();
+        else if (stalkMatch) moveTarget = "stalk";
+        else if (wanderMatch) moveTarget = "wander";
+
+        // Strip the directive from visible reply
+        const cleanReply = rawReply
+            .replace(/\[MOVE:[^\]]+\]/gi, "")
+            .trim();
+
+        // Only send visible reply if it has actual content
+        const finalReply = cleanReply.length > 1 ? cleanReply : null;
+
+        res.json({ reply: finalReply, moveTarget: moveTarget });
 
     } catch (err) {
         console.error("Groq error:", err.message);
-        res.status(500).json({ reply: "...", moveTarget: "wander" });
+        res.status(500).json({ reply: null, moveTarget: "wander" });
     }
 });
 

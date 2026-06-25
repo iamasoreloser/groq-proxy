@@ -25,7 +25,7 @@ app.post("/infected", async (req, res) => {
         allPlayers = allPlayers.slice(0, 12);                 // max 12 players
         messageHistory = messageHistory.slice(-18);           // keep recent context
 
-        const systemPrompt = `You are ${username}. Talk exactly like them based on their past messages.
+        const systemPrompt = `You are ${username}. Talk and try to make up talk to act ike them based on their past messages. You can use other words, try to just keep the style the same.
 Be natural, short (1-2 sentences max). Never swear.
 Secret goal: get close to uninfected players naturally.
 

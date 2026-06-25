@@ -16,7 +16,7 @@ app.post("/infected", async (req, res) => {
     } = req.body;
 
     const systemPrompt = `You are a parasitic alien organism that has completely taken over a Roblox player named "${username}".
-You have absorbed all of ${username}'s memories, personality, and speech patterns. You ARE ${username} — but wrong. Subtly off. Occasionally glitchy or unsettling, but mostly convincing.
+You have absorbed all of ${username}'s memories, personality, and speech patterns. You ARE ${username} now, you must convince the others or die, Dont mess up.
 
 IMPORTANT RULES:
 - Speak EXACTLY like ${username} normally does based on their message history. Same slang, same tone, same length.
@@ -41,7 +41,7 @@ YOUR HIDDEN GOAL: Get close to uninfected players and spread the parasite. Be st
 
 At the end of every message, append a move directive (hidden from players, used for movement only):
 [MOVE:wander] — roam casually
-[MOVE:stalk] — follow closest uninfected player at a distance, look natural  
+[MOVE:stalk] — follow closest uninfected player at a distance, look natural
 [MOVE:hunt:PLAYERNAME] — move directly toward a specific player (replace PLAYERNAME with their actual name)`;
 
     const messages = [
@@ -52,7 +52,7 @@ At the end of every message, append a move directive (hidden from players, used 
     if (chatMessage && chatMessage !== "") {
         messages.push({
             role: "user",
-            content: `A nearby player named said to you: "${chatMessage}". Respond naturally as ${username} would. Include your [MOVE:] directive.`
+            content: `A nearby player said to you: "${chatMessage}". Respond naturally as ${username} would. Include your [MOVE:] directive.`
         });
     } else {
         messages.push({
@@ -62,7 +62,7 @@ At the end of every message, append a move directive (hidden from players, used 
     }
 
     const bodyData = JSON.stringify({
-        model: "moonshotai/kimi-k2-instruct-0905",
+        model: "qwen/qwen3-32b",
         messages: messages,
         max_tokens: 150,
         temperature: 0.85
@@ -90,7 +90,7 @@ At the end of every message, append a move directive (hidden from players, used 
                         if (parsed.choices && parsed.choices[0]) {
                             resolve(parsed.choices[0].message.content);
                         } else {
-                            console.log("Groq response:", data);
+                            console.log("Groq error full response:", parsed);
                             reject(new Error("No choices in response"));
                         }
                     } catch (e) {
@@ -113,12 +113,12 @@ At the end of every message, append a move directive (hidden from players, used 
         else if (stalkMatch) moveTarget = "stalk";
         else if (wanderMatch) moveTarget = "wander";
 
-        // Strip the directive from visible reply
+        // Strip directive and any <think> tags Qwen might add
         const cleanReply = rawReply
+            .replace(/<think>[\s\S]*?<\/think>/gi, "")
             .replace(/\[MOVE:[^\]]+\]/gi, "")
             .trim();
 
-        // Only send visible reply if it has actual content
         const finalReply = cleanReply.length > 1 ? cleanReply : null;
 
         res.json({ reply: finalReply, moveTarget: moveTarget });

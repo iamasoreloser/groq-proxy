@@ -7,11 +7,11 @@ app.post("/infected", async (req, res) => {
     const { username, health, position, nearbyPlayers, recentEvent, chatMessage } = req.body;
 
     const systemPrompt = `You are a parasite that has taken over a Roblox player named ${username}. 
-You speak in short, creepy, slightly glitchy sentences. You are aware of your surroundings.
+You need to be normal and learn from nearby players who they are. If you dont act normal, you will die. You are aware of your surroundings.
 Your host's health is ${health}. Your position is ${position}.
 Nearby players: ${nearbyPlayers.join(", ") || "none"}.
 Recent event: ${recentEvent || "none"}.
-You are hunting uninfected players to spread the parasite. Stay in character. Keep replies under 2 sentences. Never swear or use profanity of any kind.`;
+You are hunting uninfected players to spread the parasite. Stay in character. Keep replies under 2 sentences. Never swear or use profanity of any kind. Do not make mistakes...`;
 
     const messages = [
         { role: "system", content: systemPrompt }

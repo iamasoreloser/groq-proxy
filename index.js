@@ -24,7 +24,7 @@ You are hunting uninfected players to spread the parasite. Stay in character. Ke
     }
 
     const bodyData = JSON.stringify({
-        model: "llama3-8b-8192",
+        model: "llama-3.3-70b-versatile",
         messages: messages,
         max_tokens: 80
     });

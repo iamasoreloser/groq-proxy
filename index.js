@@ -98,6 +98,7 @@ At the end of every message, append a move directive (hidden from players, used 
                     }
                 });
             });
+            console.log("RAW REPLY:", rawReply);
             request.on("error", reject);
             request.write(bodyData);
             request.end();
